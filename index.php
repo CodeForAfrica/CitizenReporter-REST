@@ -18,6 +18,11 @@ add_action( 'rest_api_init', function () {
         'methods' => 'GET',
         'callback' => 'get_recent_user_posts',
     ) );
+
+    register_rest_route( 'crrest/v1', 'user', array(
+        'methods' => 'GET',
+        'callback' => 'get_user_info',
+    ) );
 } );
 
 
@@ -171,6 +176,7 @@ function get_user_info( $data ){
     $user = get_user_by( "email", $username );
     $user_id = $user->ID;
     $p = array();
+    $p['avatar'] = get_avatar_url( $user_id);
     $p['user_id'] = $user_id;
     $p['username'] = get_userdata($user_id)->user_login;
     $p['password'] = get_user_meta($user_id, 'password', TRUE);
