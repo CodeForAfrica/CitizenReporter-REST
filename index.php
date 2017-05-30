@@ -8,36 +8,42 @@
  */
 
 
-add_action( 'rest_api_init', function () {
-    register_rest_route( 'crrest/v1', '/assignments', array(
+add_action('rest_api_init', function () {
+    register_rest_route('crrest/v1', '/assignments', array(
         'methods' => 'GET',
         'callback' => 'get_current_assignments',
     ));
 
-    register_rest_route( 'crrest/v1', 'user/posts/(?P<id>\d+)', array(
+    register_rest_route('crrest/v1', 'bot/assignments', array(
+        'methods' => 'GET',
+        'callback' => 'get_current_assignments_bot',
+    ));
+
+    register_rest_route('crrest/v1', 'user/posts/(?P<id>\d+)', array(
         'methods' => 'GET',
         'callback' => 'get_recent_user_posts',
-    ) );
+    ));
 
-    register_rest_route( 'crrest/v1', 'user', array(
+    register_rest_route('crrest/v1', 'user', array(
         'methods' => 'GET',
         'callback' => 'get_user_info',
-    ) );
-} );
+    ));
+});
 
 
-function get_current_assignments(){
-    $query = array('post_type'=>"assignment");
+function get_current_assignments()
+{
+    $query = array('post_type' => "assignment");
 
     $posts_list = wp_get_recent_posts($query);
 
-    if ( !$posts_list )
+    if (!$posts_list)
         return array();
 
     $struct = array();
 
     foreach ($posts_list as $entry) {
-        if ($entry["post_status"] == "publish")  {
+        if ($entry["post_status"] == "publish") {
             $author = get_userdata($entry['post_author']);
             $title = $entry["post_title"];
             $content = $entry["post_content"];
@@ -76,19 +82,20 @@ function get_current_assignments(){
     }
 
     $recent_posts = array();
-    for ( $j=0; $j<count($struct); $j++ ) {
+    for ($j = 0; $j < count($struct); $j++) {
         array_push($recent_posts, $struct[$j]);
     }
 
-    return array("assignments"=>$recent_posts);
+    return array("assignments" => $recent_posts);
 }
 
-function get_recent_user_posts( $data ){
-    $posts_list = wp_get_recent_posts( array(
+function get_recent_user_posts($data)
+{
+    $posts_list = wp_get_recent_posts(array(
         'author' => $data['id'],
         'post_status' => 'any',
         'post_type' => 'post'
-    ) );
+    ));
 
     if (!$posts_list)
         return array();
@@ -152,15 +159,15 @@ function get_recent_user_posts( $data ){
                 'mt_allow_comments' => $allow_comments,
                 'mt_allow_pings' => $allow_pings,
                 'mt_keywords' => $tagnames,
+                'custom_fields' => get_post_meta($entry['ID']),
                 'wp_slug' => $entry['post_name'],
                 'wp_password' => $entry['post_password'],
                 'wp_author_id' => (string)$author->ID,
                 'wp_author_display_name' => $author->display_name,
                 'post_status' => $entry['post_status'],
-//                'custom_fields' => get_custom_fields($entry['ID']),
                 'wp_post_format' => $post_format,
                 'sticky' => ($entry['post_type'] === 'post' && is_sticky($entry['ID'])),
-                'wp_post_thumbnail' => get_post_thumbnail_id($entry['ID'], 'full')
+                'created' => $entry['post_date']
             );
         }
     }
@@ -170,13 +177,14 @@ function get_recent_user_posts( $data ){
 
 }
 
-function get_user_info( $data ){
+function get_user_info($data)
+{
     $username = $data['username'];
 
-    $user = get_user_by( "email", $username );
+    $user = get_user_by("email", $username);
     $user_id = $user->ID;
     $p = array();
-    $p['avatar'] = get_avatar_url( $user_id);
+    $p['avatar'] = get_avatar_url($user_id);
     $p['user_id'] = $user_id;
     $p['username'] = get_userdata($user_id)->user_login;
     $p['password'] = get_user_meta($user_id, 'password', TRUE);
@@ -187,7 +195,73 @@ function get_user_info( $data ){
     $p['location'] = get_user_meta($user_id, 'location', TRUE);
     $p['address'] = get_user_meta($user_id, 'address', TRUE);
 
-    return array("user"=>$p);
+    return array("user" => $p);
 
+
+}
+
+function get_current_assignments_bot()
+{
+    $query = array('post_type' => "assignment");
+
+    $posts_list = wp_get_recent_posts($query);
+
+    if (!$posts_list)
+        return array();
+
+    $struct = array();
+
+    foreach ($posts_list as $entry) {
+        if ($entry["post_status"] == "publish") {
+            $assignment_id = $entry->ID;
+            $title = $entry["post_title"];
+            $content = $entry["post_content"];
+
+            //get assignment thumbnail
+            $thumb = wp_get_attachment_image_src(get_post_thumbnail_id($entry['ID']), 'full');
+            $url = $thumb['0'];
+
+
+            $args = array(
+                'post_type' => 'post',
+                'meta_key' => 'assignment_id',
+                'meta_value' => $entry->ID
+            );
+            $responses = get_posts($args);
+            $responses = sizeof($responses);
+            $end_date = get_post_meta($entry->ID, 'assignment_date', true);
+
+            $struct[] = array(
+                "assignment_id" => $entry->ID,
+                "title" => $title,
+                "subtitle" => $content,
+                "image_url" => $url,
+                "buttons" => [array(
+                    "set_attributes" => array("assignment_id" => $assignment_id),
+                    "type" => "show_block",
+                    "block_names" => ["init_report",],
+                    "title" => "Start Reporting",
+                ),
+                array("url" => "citizenreporter.codeforafrica.net",
+                "type" => "json_plugin_url",
+                "title" => "Get More Detail")
+                ]
+
+            );
+        }
+    }
+
+    $data = array(
+        "messages"=> [array(
+            "attachment"=>array(
+                "type"=>"template",
+                "payload"=>array(
+                    "template_type"=> "generic",
+                    "elements"=>$struct
+                )
+            )
+        )]
+    );
+    return($data);
 
 }
