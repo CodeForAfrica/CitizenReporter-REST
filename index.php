@@ -28,6 +28,10 @@ add_action('rest_api_init', function () {
         'methods' => 'GET',
         'callback' => 'get_user_info',
     ));
+    register_rest_route('crrest/v1', 'posts', array(
+        'methods' => 'POST',
+        'callback' => 'create_post',
+    ));
 });
 
 
@@ -200,6 +204,52 @@ function get_user_info($data)
 
 }
 
+function create_post(WP_REST_Request $request){
+    $fb_id = $request->get_param( 'fb_id' );
+    $fb_first_name = $request->get_param( 'fb_first_name' );
+    $fb_last_name = $request->get_param( 'fb_last_name' );
+    $media = $request->get_param( 'media' );
+    $qwhat = $request->get_param( 'whatHappened' );
+    $qwho = $request->get_param( 'qWhoIsInvolved' );
+    $qwhy = $request->get_param( 'qWhyHappen' );
+    $location = $request->get_param( 'address' );
+    $assignment_id = $request->get_param( 'assignment_id' );
+    $qWhen = $request->get_param( 'qWhen' );
+    $qhow = $request->get_param( 'howHappened' );
+
+    $post_array = array(
+        "post_status" => "draft",
+        "post_author" => 93,
+        "post_title" => $qwhat,
+        "post_content" => $qwhy,
+        "post_meta" => array(
+            "qwhy" => $qwhy,
+            "qhow" => $qhow,
+            "qwho" => $qwho,
+            "string_location" => $location,
+            "author_firstname" => $fb_first_name,
+            "author_lastname" => $fb_last_name,
+            "assignment_id" => $assignment_id,
+            "fb_id" => $fb_id,
+            "remote_mediapaths" => $media
+        ),
+    );
+
+    $post_id = wp_insert_post($post_array, $wp_error = true);
+    if ($post_id){
+        add_post_meta($post_id, "qwhy", $qwhy);
+        add_post_meta($post_id, "qhow", $qhow);
+        add_post_meta($post_id, "qwho", $qwho);
+        add_post_meta($post_id, "string_location", $location );
+        add_post_meta($post_id, "author_firstname", $fb_first_name);
+        add_post_meta($post_id, "author_lastname", $fb_last_name);
+        add_post_meta($post_id, "assignment_id". $assignment_id );
+        add_post_meta($post_id, "fb_id", $fb_id);
+        add_post_meta($post_id, "remote_mediapaths", $media);
+    }
+    return array("Post ID" => $post_id);
+}
+
 function get_current_assignments_bot()
 {
     $query = array('post_type' => "assignment");
@@ -242,9 +292,9 @@ function get_current_assignments_bot()
                     "block_names" => ["init_report",],
                     "title" => "Start Reporting",
                 ),
-                array("url" => "citizenreporter.codeforafrica.net",
-                "type" => "json_plugin_url",
-                "title" => "Get More Detail")
+                    array("url" => "citizenreporter.codeforafrica.net",
+                        "type" => "json_plugin_url",
+                        "title" => "Get More Detail")
                 ]
 
             );
