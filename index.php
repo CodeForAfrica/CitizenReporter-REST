@@ -32,6 +32,10 @@ add_action('rest_api_init', function () {
         'methods' => 'POST',
         'callback' => 'create_post',
     ));
+    register_rest_route('crrest/v1', 'user/register', array(
+        'methods' => 'POST',
+        'callback' => 'register_user',
+    ));
 });
 
 
@@ -205,9 +209,9 @@ function get_user_info($data)
 }
 
 function create_post(WP_REST_Request $request){
-    $fb_id = $request->get_param( 'fb_id' );
-    $fb_first_name = $request->get_param( 'fb_first_name' );
-    $fb_last_name = $request->get_param( 'fb_last_name' );
+    $fb_id = $request->get_param( 'chatfuel user id' );
+    $fb_first_name = $request->get_param( 'first name' );
+    $fb_last_name = $request->get_param( 'last name' );
     $media = $request->get_param( 'media' );
     $qwhat = $request->get_param( 'whatHappened' );
     $qwho = $request->get_param( 'qWhoIsInvolved' );
@@ -216,6 +220,8 @@ function create_post(WP_REST_Request $request){
     $assignment_id = $request->get_param( 'assignment_id' );
     $qWhen = $request->get_param( 'qWhen' );
     $qhow = $request->get_param( 'howHappened' );
+
+    error_log($request, 3, "/var/tmp/my-errors.log");
 
     $post_array = array(
         "post_status" => "draft",
@@ -315,3 +321,47 @@ function get_current_assignments_bot()
     return($data);
 
 }
+
+function register_user(WP_REST_Request $request){
+    $username = $request->get_param( 'username' );
+    $email = $request->get_param( 'email' );
+    $password = $request->get_param( 'password' );
+
+    if(!isset($username)||(!$password) ||(!$email)){
+        return array("result"=>"NOK", "message"=>"missing required fields!", "username"=>$username, "password"=>$password, "email"=>$email);
+    }
+
+    if( null == username_exists( $username ) ) {
+
+        // Generate the password and create the user
+        //$password = wp_generate_password( 12, false );
+        $user_id = wp_create_user( $username, $password, $email );
+        if(isset($_POST['operatorName'])){
+            wp_update_user( array ('ID' => $user_id, 'operatorName' => $_POST['operatorName']) ) ;
+        }
+        if(isset($_POST['deviceId'])){
+            wp_update_user( array ('ID' => $user_id, 'deviceId' => $_POST['deviceId']) ) ;
+        }
+        if(isset($_POST['serialNumber'])){
+            wp_update_user( array ('ID' => $user_id, 'serialNumber' => $_POST['serialNumber']) ) ;
+        }
+        // Set the nickname
+        wp_update_user(
+            array(
+                'ID'          =>    $user_id,
+                'nickname'    =>    $email,
+            )
+        );
+
+        // Set the role
+        $user = new WP_User( $user_id );
+        $user->set_role( 'editor' );
+        return array("result"=>"OK", "message"=>"Registration successful!", "user_id"=>$user_id);
+    }else{
+        return array("result"=>"NOK", "message"=>"User already exists!");
+
+    }
+
+
+}
+
